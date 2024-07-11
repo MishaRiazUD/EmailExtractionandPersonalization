@@ -1,0 +1,77 @@
+function extractEmailsToSheet() {
+  var sheetName = 'email'; 
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+
+
+  sheet.getRange('A2:E').clearContent();
+  
+  var searchQuery = 'is:inbox'; 
+  var threads = GmailApp.search(searchQuery);
+  
+  for (var i = 0; i < threads.length; i++) {
+    var thread = threads[i];
+    var messages = thread.getMessages();
+    
+    for (var j = 0; j < messages.length; j++) {
+      var message = messages[j];
+      var timeStamp = message.getDate();
+      var mailSubject = message.getSubject();
+      var fromEmail = message.getFrom();
+      
+      var nameMatch = fromEmail.match(/(?:"?([^"]*)"?\s)?(?:<?(.+@[^>]+)>?)/);
+      var senderName = nameMatch ? nameMatch[1] || nameMatch[2] : fromEmail;
+      
+      sheet.appendRow([timeStamp, (j + 1), mailSubject, fromEmail, senderName]);
+    }
+  }
+}
+
+function sendPersonalizedEmails() {
+  var sheetName = 'email';
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  
+  if (!sheet) {
+    Logger.log("Sheet 'email' not found.");
+    return;
+  }
+
+  var dataRange = sheet.getDataRange();
+  var data = dataRange.getValues();
+  
+  for (var i = 1; i < data.length; i++) {
+    var timeStamp = data[i][0];
+    var thread = data[i][1];
+    var mailSubject = data[i][2];
+    var recipientEmail = data[i][3];
+    var senderName = data[i][4];
+
+    var message = createEmailBody(timeStamp, thread, mailSubject, senderName);
+
+    try {
+      GmailApp.sendEmail(recipientEmail, `Personalized Email: ${mailSubject}`, '', {
+        htmlBody: message
+      });
+      Logger.log(`Email sent to ${recipientEmail}`);
+    } catch (error) {
+      Logger.log(`Failed to send email to ${recipientEmail}: ${error}`);
+      continue;
+    }
+    
+    Utilities.sleep(1000); 
+  }
+}
+
+function createEmailBody(timestamp, thread, subject, senderName, emailBody) {
+  var htmlBody = `
+    <p>Hello, ${senderName}</p>
+    <p>Here are the details of the email:</p>
+    <ul>
+      <li><strong>Timestamp:</strong> ${timestamp}</li>
+      <li><strong>Thread Count:</strong> ${thread}</li>
+      <li><strong>Subject:</strong> ${subject}</li>
+    </ul>
+    <p>This email is just a test to ensure our communication system is working smoothly.</p>
+    <p>Best regards,<br>M.R</p>
+  `;
+  return htmlBody;
+}
